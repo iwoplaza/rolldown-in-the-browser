@@ -3,12 +3,8 @@ import serviceWorkerUrl from "../service-worker?url";
 export async function registerServiceWorker() {
   if ("serviceWorker" in navigator) {
     try {
-      const registration = await navigator.serviceWorker.register(
-        serviceWorkerUrl,
-        {
-          scope: "/",
-        },
-      );
+      const registration =
+        await navigator.serviceWorker.register(serviceWorkerUrl);
 
       if (registration.installing) {
         console.log("Service worker installing");
