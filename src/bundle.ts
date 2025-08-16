@@ -2,7 +2,7 @@ import type { InputOptions, OutputOptions } from "@rolldown/browser";
 import { resolve } from "pathe";
 
 export interface BundleResult {
-  output: Record<string, string>;
+  output: Record<string, string | Uint8Array>;
   warnings?: string[];
 }
 
@@ -17,10 +17,8 @@ export type FileMap = Record<string, string>;
 export async function bundle(
   files: FileMap,
   entries: string[],
-  config: any = {},
+  config: InputOptions & { output?: OutputOptions | undefined } = {},
 ): Promise<BundleResult> {
-  console.log("Trying rolldown...");
-
   const rolldown = await import("@rolldown/browser");
 
   const warnings: string[] = [];
@@ -41,14 +39,18 @@ export async function bundle(
       {
         name: "virtual-fs",
         resolveId(source, importer) {
-          if (source[0] === "/" || source[0] === ".") {
+          if (source[0] === "/") {
+            // Absolute import
+            return source;
+          }
+          if (source[0] === ".") {
+            // Relative import
             return resolve(importer || "/", "..", source);
           }
         },
         load(id) {
           if (id[0] !== "/") return;
-          const filename = id.slice(1);
-          return files[filename];
+          return files[id];
         },
       },
       ...(Array.isArray(config?.plugins)
@@ -62,9 +64,6 @@ export async function bundle(
     ...config?.output,
   };
 
-  console.info("Rolldown input options", inputOptions);
-  console.info("Rolldown output options", outputOptions);
-
   const bundle = await rolldown.rolldown(inputOptions);
   const result = await bundle.generate(outputOptions);
 
@@ -72,10 +71,7 @@ export async function bundle(
     result.output.map((chunk) =>
       chunk.type === "chunk"
         ? [chunk.fileName, chunk.code]
-        : [
-            chunk.fileName,
-            typeof chunk.source === "string" ? chunk.source : "[BINARY]",
-          ],
+        : [chunk.fileName, chunk.source],
     ),
   );
 
